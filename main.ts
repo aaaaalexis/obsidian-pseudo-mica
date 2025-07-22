@@ -191,11 +191,17 @@ export default class PseudoMica extends Plugin {
 
     // Removed 'styles' parameter
     const updatePosition = () => {
-      const { screenX, screenY } = window;
+      let { screenX, screenY } = window;
       if (this.lastPosition.x !== screenX || this.lastPosition.y !== screenY) {
-
-        const displayPositions = getCurrentDisplayPositions()
+        
+        const displayPositions = getCurrentDisplayPositions();
         Object.assign(this.lastPosition, { x: screenX, y: screenY });
+        
+        const isFullScreen = electron.remote.getCurrentWindow().isFullScreen();
+        if (isFullScreen) {
+          screenX = 0;
+          screenY = 0;
+        }
         // Update CSS variables directly on the body's style
         document.body.style.setProperty("--pseudo-mica-translate-x", `${-screenX+displayPositions.x}px`);
         document.body.style.setProperty("--pseudo-mica-translate-y", `${-screenY+displayPositions.y}px`);
