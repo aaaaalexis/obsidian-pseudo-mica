@@ -211,7 +211,7 @@ export default class PseudoMica extends Plugin {
         document.body.style.setProperty("--pseudo-mica-screen-width", `${screenWidth}px`);
         document.body.style.setProperty("--pseudo-mica-screen-height", `${screenHeight}px`);
       }
-      this.frameRequest = requestAnimationFrame(updatePosition);
+      this.frameRequest = requestAnimationFrame(updateSize);
     }
 
     const handleResize = () => {
