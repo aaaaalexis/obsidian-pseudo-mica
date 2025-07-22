@@ -94,7 +94,7 @@ export default class PseudoMica extends Plugin {
   settings: PseudoMicaSettings;
   private styleEl = document.createElement("style");
   private readonly exec = promisify(require("child_process").exec);
-  private lastPosition = { x: 0, y: 0, width: 0, height: 0 };
+  private lastPosition: Position = { x: 0, y: 0, width: 0, height: 0 };
   private frameRequest: number | null = null;
   private resizeTimer: NodeJS.Timeout | null = null;
   private isInitialized = false;
@@ -143,14 +143,16 @@ export default class PseudoMica extends Plugin {
         // Define CSS variables for transform values
         document.body.style.setProperty("--pseudo-mica-translate-x", "0px");
         document.body.style.setProperty("--pseudo-mica-translate-y", "0px");
+        document.body.style.setProperty("--pseudo-mica-screen-width", `${window.screen.width}px`);
+        document.body.style.setProperty("--pseudo-mica-screen-height", `${window.screen.height}px`);
 
         const styles = `
                   body {
                       --titlebar-background-focused: transparent;
                   }
                   body::before {
-                      width: ${window.screen.width}px;
-                      height: ${window.screen.height}px;
+                      width: var(--pseudo-mica-screen-width);
+                      height: var(--pseudo-mica-screen-height);
                       background-image: url(data:image/jpeg;base64,${base64Image});
                       position: fixed;
                       transform-origin: top left;
@@ -178,17 +180,39 @@ export default class PseudoMica extends Plugin {
   }
 
   private setupPositionTracking() {
+
+    // Calculates position of current app monitor in whole screen matrix
+    const getCurrentDisplayPositions = () => {
+      const currentWindow = electron.remote.getCurrentWindow()
+      const currentDisplay = electron.remote.screen.getDisplayMatching(currentWindow.getBounds())
+      return { x: currentDisplay.bounds.x, y: currentDisplay.bounds.y }
+    }
+
     // Removed 'styles' parameter
     const updatePosition = () => {
       const { screenX, screenY } = window;
       if (this.lastPosition.x !== screenX || this.lastPosition.y !== screenY) {
+
+        const displayPositions = getCurrentDisplayPositions()
         Object.assign(this.lastPosition, { x: screenX, y: screenY });
         // Update CSS variables directly on the body's style
-        document.body.style.setProperty("--pseudo-mica-translate-x", `${-screenX}px`);
-        document.body.style.setProperty("--pseudo-mica-translate-y", `${-screenY}px`);
+        document.body.style.setProperty("--pseudo-mica-translate-x", `${-screenX+displayPositions.x}px`);
+        document.body.style.setProperty("--pseudo-mica-translate-y", `${-screenY+displayPositions.y}px`);
       }
       this.frameRequest = requestAnimationFrame(updatePosition);
     };
+
+    const updateSize = () => {
+      const { width: screenWidth, height: screenHeight } = window.screen;
+      
+      // Screen size changed due to monitor change
+      if (this.lastPosition.width !== screenWidth || this.lastPosition.height !== screenHeight) {
+        Object.assign(this.lastPosition, { width: screenWidth, height: screenHeight })
+        document.body.style.setProperty("--pseudo-mica-screen-width", `${screenWidth}px`);
+        document.body.style.setProperty("--pseudo-mica-screen-height", `${screenHeight}px`);
+      }
+      this.frameRequest = requestAnimationFrame(updatePosition);
+    }
 
     const handleResize = () => {
       this.resizeTimer && clearTimeout(this.resizeTimer);
@@ -198,6 +222,7 @@ export default class PseudoMica extends Plugin {
         // Potentially re-initialize if screen dimensions for wallpaper change significantly
         // For now, just update position. If wallpaper re-rendering on resize is needed,
         // that would be a more complex change involving re-calling initializeWallpaper logic.
+        updateSize();
       }, 100);
     };
 
@@ -213,6 +238,8 @@ export default class PseudoMica extends Plugin {
       // Clean up CSS variables if necessary
       document.body.style.removeProperty("--pseudo-mica-translate-x");
       document.body.style.removeProperty("--pseudo-mica-translate-y");
+      document.body.style.removeProperty("--pseudo-mica-screen-width");
+      document.body.style.removeProperty("--pseudo-mica-screen-height");
     });
   }
 
