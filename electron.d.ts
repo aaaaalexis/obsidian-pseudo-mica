@@ -9,6 +9,8 @@ declare namespace electron {
     const remote: {
         getCurrentWindow(): {
             getBounds(): Bounds
+
+            isFullScreen(): boolean
         }
 
         screen: {
