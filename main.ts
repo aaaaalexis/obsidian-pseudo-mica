@@ -240,6 +240,8 @@ export default class PseudoMica extends Plugin {
       document.body.style.removeProperty("--pseudo-mica-translate-y");
       document.body.style.removeProperty("--pseudo-mica-screen-width");
       document.body.style.removeProperty("--pseudo-mica-screen-height");
+
+      document.body.classList.remove("is-translucent");
     });
   }
 
