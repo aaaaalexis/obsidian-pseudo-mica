@@ -167,6 +167,7 @@ export default class PseudoMica extends Plugin {
                       
                   .is-translucent:not(.is-fullscreen) .titlebar {
                       background-color: transparent;
+                      --titlebar-background: transparent;
                   }`;
 
         document.head.appendChild(this.styleEl);
