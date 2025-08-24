@@ -150,7 +150,7 @@ export default class PseudoMica extends Plugin {
                   body {
                       --titlebar-background-focused: transparent;
                   }
-                  body::before {
+                  .app-container::before {
                       width: var(--pseudo-mica-screen-width);
                       height: var(--pseudo-mica-screen-height);
                       background-image: url(data:image/jpeg;base64,${base64Image});
