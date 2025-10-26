@@ -255,7 +255,7 @@ export default class PseudoMica extends Plugin {
   private async getWallpaperPath(): Promise<string> {
     if (!Platform.isWin) return "";
     try {
-      const { stdout } = await this.exec(`powershell -command "(Get-ItemProperty -Path 'HKCU:\\Control Panel\\Desktop' -Name Wallpaper).Wallpaper"`);
+      const { stdout } = await this.exec(`powershell -noprofile -command "[Console]::OutputEncoding = [System.Text.Encoding]::UTF8; (Get-ItemProperty -Path 'HKCU:\\Control Panel\\Desktop' -Name Wallpaper).Wallpaper"`);
       return stdout.trim();
     } catch {
       return "";
