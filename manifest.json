@@ -1,9 +1,9 @@
 {
   "id": "pseudo-mica",
   "name": "Pseudo Mica",
-  "version": "1.0.5",
+  "version": "2.0.0",
   "minAppVersion": "1.8.0",
-  "description": "Mica-like background effect for Windows.",
+  "description": "Enable Mica or Acrylic on Windows 11.",
   "author": "Alexis C",
   "isDesktopOnly": true
 }

@@ -1,5 +1,3 @@
 # Pseudo Mica for Obsidian
 
-Add Mica-like background effect for Obsidian on Windows, using your wallpaper as the background.
-
-IMPORTANT: This plugin is VERY resource heavy due to the implementation of the transparency effect, high CPU and battery usage are expected.
+Apply Mica, Mica Alt and Acrylic to your Obsidian vault. Requires Windows 11 22H2 and up.
