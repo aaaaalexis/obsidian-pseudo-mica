@@ -1,6 +1,6 @@
 {
   "name": "pseudo-mica",
-  "version": "1.0.4",
+  "version": "1.0.5",
   "description": "Mica-like background effect for Windows",
   "main": "main.js",
   "scripts": {

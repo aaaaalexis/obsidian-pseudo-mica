@@ -1,8 +1,8 @@
 {
   "id": "pseudo-mica",
   "name": "Pseudo Mica",
-  "version": "1.0.4",
-  "minAppVersion": "1.6.1",
+  "version": "1.0.5",
+  "minAppVersion": "1.8.0",
   "description": "Mica-like background effect for Windows.",
   "author": "Alexis C",
   "isDesktopOnly": true
