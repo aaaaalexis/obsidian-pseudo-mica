@@ -1,9 +1,9 @@
 {
   "id": "pseudo-mica",
   "name": "Pseudo Mica",
-  "version": "2.0.0",
+  "version": "2.1.0",
   "minAppVersion": "1.8.0",
-  "description": "Enable Mica or Acrylic on Windows 11.",
+  "description": "Swap background material and vibrancy effects on Windows 11 and macOS.",
   "author": "Alexis C",
   "isDesktopOnly": true
 }
