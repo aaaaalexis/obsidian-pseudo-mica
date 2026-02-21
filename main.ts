@@ -1,21 +1,21 @@
-import { App, Notice, Platform, Plugin, PluginSettingTab, Setting } from "obsidian";
+import { App, FuzzySuggestModal, Platform, Plugin } from "obsidian";
 
 type MaterialType = "none" | "mica" | "tabbed" | "acrylic";
 type VibrancyType = "titlebar" | "selection" | "menu" | "popover" | "sidebar" | "header" | "sheet" | "window" | "hud" | "fullscreen-ui" | "tooltip" | "content" | "under-window" | "under-page" | null;
 
 interface BrowserWindow {
   setBackgroundMaterial(material: MaterialType): void;
-  setVibrancy(type: VibrancyType, options?: { animationDuration?: number }): void;
+  setVibrancy(type: VibrancyType): void;
 }
 
 interface PseudoMicaSettings {
-  backgroundMaterial: MaterialType;
+  material: MaterialType;
   vibrancy: VibrancyType;
 }
 
 const DEFAULT_SETTINGS: PseudoMicaSettings = {
-  backgroundMaterial: "mica",
-  vibrancy: "window",
+  material: "mica",
+  vibrancy: "sidebar",
 };
 
 export default class PseudoMicaPlugin extends Plugin {
@@ -30,37 +30,37 @@ export default class PseudoMicaPlugin extends Plugin {
     if (!this.electronWindow) return;
 
     if (Platform.isWin) {
-      this.applyBackgroundMaterial();
+      this.applyMaterial();
       document.body.classList.add("is-translucent");
       document.body.style.setProperty("--workspace-background-translucent", "transparent", "important");
-
-      if (document.body.classList.contains("is-hidden-frameless")) {
-        document.body.style.setProperty("--titlebar-background", "transparent", "important");
-        document.body.style.setProperty("--titlebar-background-focused", "transparent", "important");
-      }
+      document.body.style.setProperty("--titlebar-background", "transparent", "important");
+      document.body.style.setProperty("--titlebar-background-focused", "transparent", "important");
     } else if (Platform.isMacOS) {
       this.applyVibrancy();
     }
 
-    this.addSettingTab(new PseudoMicaSettingTab(this.app, this));
+    const openSettings = () => {
+      if (Platform.isWin) new PseudoMicaMaterialModal(this.app, this).open();
+      else if (Platform.isMacOS) new PseudoMicaVibrancyModal(this.app, this).open();
+    };
+
+    const effectLabel = Platform.isWin ? "Change material" : "Change vibrancy";
+    this.addRibbonIcon("layers", effectLabel, openSettings);
+
     this.addCommand({
-      id: "cycle-background-material",
-      name: "Cycle background material",
-      callback: () => this.cycleBackgroundMaterial(),
+      id: "open-pseudo-mica-settings",
+      name: effectLabel,
+      callback: openSettings,
     });
   }
 
   onunload() {
     if (Platform.isWin) {
+      this.electronWindow?.setBackgroundMaterial?.("none");
       document.body.classList.remove("is-translucent");
       document.body.style.removeProperty("--workspace-background-translucent");
-
-      if (document.body.classList.contains("is-hidden-frameless")) {
-        document.body.style.removeProperty("--titlebar-background");
-        document.body.style.removeProperty("--titlebar-background-focused");
-      }
-
-      this.electronWindow?.setBackgroundMaterial?.("none");
+      document.body.style.removeProperty("--titlebar-background");
+      document.body.style.removeProperty("--titlebar-background-focused");
     } else if (Platform.isMacOS) {
       this.electronWindow?.setVibrancy?.(null);
     }
@@ -82,104 +82,135 @@ export default class PseudoMicaPlugin extends Plugin {
     }
   }
 
-  applyBackgroundMaterial() {
+  applyMaterial() {
     try {
-      this.electronWindow?.setBackgroundMaterial?.(this.settings.backgroundMaterial);
+      this.electronWindow?.setBackgroundMaterial?.(this.settings.material);
     } catch (error) {
-      console.error("Error applying background material:", error);
+      console.error("Error applying material:", error);
     }
   }
 
   applyVibrancy() {
     try {
-      this.electronWindow?.setVibrancy?.(this.settings.vibrancy, { animationDuration: 200 });
+      this.electronWindow?.setVibrancy?.(this.settings.vibrancy);
     } catch (error) {
       console.error("Error applying vibrancy:", error);
     }
   }
+}
 
-  private cycleBackgroundMaterial() {
-    if (Platform.isWin) {
-      const materials: MaterialType[] = ["mica", "tabbed", "acrylic"];
-      const nextIndex = (materials.indexOf(this.settings.backgroundMaterial) + 1) % materials.length;
+interface LabeledOption<T extends string> {
+  value: T;
+  label: string;
+}
 
-      this.settings.backgroundMaterial = materials[nextIndex];
-      this.saveSettings();
-      this.applyBackgroundMaterial();
+abstract class PseudoMicaModal<T extends string> extends FuzzySuggestModal<LabeledOption<T>> {
+  protected abstract readonly options: LabeledOption<T>[];
+  private readonly originalValue: T | null;
+  private confirmed = false;
 
-      new Notice(`Background material: ${this.settings.backgroundMaterial}`);
-    } else if (Platform.isMacOS) {
-      const vibrancies: VibrancyType[] = ["titlebar", "selection", "menu", "popover", "sidebar", "header", "sheet", "window", "hud", "tooltip", "content"];
-      const currentIndex = vibrancies.indexOf(this.settings.vibrancy as VibrancyType);
-      const nextIndex = (currentIndex + 1) % vibrancies.length;
+  constructor(
+    app: App,
+    protected readonly plugin: PseudoMicaPlugin,
+    placeholder: string,
+  ) {
+    super(app);
+    this.setPlaceholder(placeholder);
+    this.originalValue = this.getSetting();
+  }
 
-      this.settings.vibrancy = vibrancies[nextIndex];
-      this.saveSettings();
-      this.applyVibrancy();
+  protected abstract getSetting(): T | null;
+  protected abstract setSetting(value: T | null): void;
+  protected abstract applyEffect(): void;
 
-      new Notice(`Vibrancy: ${this.settings.vibrancy}`);
+  onOpen(): void {
+    super.onOpen();
+    const chooser = (this as any).chooser;
+    const orig = chooser.setSelectedItem.bind(chooser);
+    chooser.setSelectedItem = (index: number, scroll: boolean) => {
+      orig(index, scroll);
+      const selected = chooser.values?.[index];
+      if (selected) {
+        this.setSetting(selected.item.value);
+        this.applyEffect();
+      }
+    };
+  }
+
+  onClose(): void {
+    if (!this.confirmed) {
+      this.setSetting(this.originalValue);
+      this.applyEffect();
     }
+  }
+
+  getItems(): LabeledOption<T>[] {
+    return this.options;
+  }
+
+  getItemText(item: LabeledOption<T>): string {
+    return item.label;
+  }
+
+  async onChooseItem(item: LabeledOption<T>): Promise<void> {
+    this.confirmed = true;
+    this.setSetting(item.value);
+    await this.plugin.saveSettings();
+    this.applyEffect();
   }
 }
 
-class PseudoMicaSettingTab extends PluginSettingTab {
-  constructor(
-    app: App,
-    private plugin: PseudoMicaPlugin,
-  ) {
-    super(app, plugin);
+class PseudoMicaMaterialModal extends PseudoMicaModal<MaterialType> {
+  protected readonly options: LabeledOption<MaterialType>[] = [
+    { value: "mica", label: "Mica" },
+    { value: "tabbed", label: "Mica Alt" },
+    { value: "acrylic", label: "Acrylic" },
+  ];
+
+  constructor(app: App, plugin: PseudoMicaPlugin) {
+    super(app, plugin, "Select material...");
   }
 
-  display(): void {
-    const { containerEl } = this;
-    containerEl.empty();
+  protected getSetting(): MaterialType {
+    return this.plugin.settings.material;
+  }
+  protected setSetting(value: MaterialType | null): void {
+    if (value) this.plugin.settings.material = value;
+  }
+  protected applyEffect(): void {
+    this.plugin.applyMaterial();
+  }
+}
 
-    if (Platform.isWin) {
-      new Setting(containerEl)
-        .setName("Background Material")
-        .setDesc("Requires Hidden or Obsidian frame style in Apperance settings.")
-        .addDropdown((dropdown) =>
-          dropdown
-            .addOptions({
-              mica: "Mica",
-              tabbed: "Mica Alt",
-              acrylic: "Acrylic",
-            })
-            .setValue(this.plugin.settings.backgroundMaterial)
-            .onChange(async (value: MaterialType) => {
-              this.plugin.settings.backgroundMaterial = value;
-              await this.plugin.saveSettings();
-              this.plugin.applyBackgroundMaterial();
-            }),
-        );
-    } else if (Platform.isMacOS) {
-      new Setting(containerEl)
-        .setName("Vibrancy Effect")
-        .setDesc("Choose a vibrancy effect for the window.")
-        .addDropdown((dropdown) =>
-          dropdown
-            .addOptions({
-              titlebar: "Titlebar",
-              selection: "Selection",
-              menu: "Menu",
-              popover: "Popover",
-              sidebar: "Sidebar",
-              header: "Header",
-              sheet: "Sheet",
-              window: "Window",
-              hud: "HUD",
-              tooltip: "Tooltip",
-              content: "Content",
-              "under-window": "Under Window",
-              "under-page": "Under Page",
-            })
-            .setValue(this.plugin.settings.vibrancy || "window")
-            .onChange(async (value: string) => {
-              this.plugin.settings.vibrancy = value as VibrancyType;
-              await this.plugin.saveSettings();
-              this.plugin.applyVibrancy();
-            }),
-        );
-    }
+class PseudoMicaVibrancyModal extends PseudoMicaModal<NonNullable<VibrancyType>> {
+  protected readonly options: LabeledOption<NonNullable<VibrancyType>>[] = [
+    { value: "titlebar", label: "Titlebar" },
+    { value: "selection", label: "Selection" },
+    { value: "menu", label: "Menu" },
+    { value: "popover", label: "Popover" },
+    { value: "sidebar", label: "Sidebar" },
+    { value: "header", label: "Header" },
+    { value: "sheet", label: "Sheet" },
+    { value: "window", label: "Window" },
+    { value: "hud", label: "HUD" },
+    { value: "fullscreen-ui", label: "Fullscreen UI" },
+    { value: "tooltip", label: "Tooltip" },
+    { value: "content", label: "Content" },
+    { value: "under-window", label: "Under Window" },
+    { value: "under-page", label: "Under Page" },
+  ];
+
+  constructor(app: App, plugin: PseudoMicaPlugin) {
+    super(app, plugin, "Select vibrancy...");
+  }
+
+  protected getSetting(): VibrancyType {
+    return this.plugin.settings.vibrancy;
+  }
+  protected setSetting(value: NonNullable<VibrancyType> | null): void {
+    this.plugin.settings.vibrancy = value;
+  }
+  protected applyEffect(): void {
+    this.plugin.applyVibrancy();
   }
 }

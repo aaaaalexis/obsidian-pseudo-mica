@@ -1,9 +1,11 @@
 {
   "id": "pseudo-mica",
   "name": "Pseudo Mica",
-  "version": "2.1.0",
-  "minAppVersion": "1.8.0",
-  "description": "Swap background material and vibrancy effects on Windows 11 and macOS.",
+  "version": "2.2.0",
+  "minAppVersion": "1.6.0",
+  "description": "Customize translucent window effects on Windows and macOS.",
   "author": "Alexis C",
+  "authorUrl": "https://github.com/aaaaalexis",
+  "fundingUrl": "https://www.buymeacoffee.com/sevenaxis",
   "isDesktopOnly": true
 }
