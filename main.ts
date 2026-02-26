@@ -1,8 +1,4 @@
-import { App, FuzzySuggestModal, Modal, Platform, Plugin, Setting } from "obsidian";
-
-function t(key: string, fallback: string): string {
-  return (window as any).i18next?.t(key) ?? fallback;
-}
+import { App, FuzzySuggestModal, Platform, Plugin } from "obsidian";
 
 type MaterialType = "none" | "mica" | "tabbed" | "acrylic";
 type VibrancyType = "titlebar" | "selection" | "menu" | "popover" | "sidebar" | "header" | "sheet" | "window" | "hud" | "fullscreen-ui" | "tooltip" | "content" | "under-window" | "under-page" | null;
@@ -40,15 +36,17 @@ export default class PseudoMicaPlugin extends Plugin {
       document.body.style.setProperty("--titlebar-background", "transparent", "important");
       document.body.style.setProperty("--titlebar-background-focused", "transparent", "important");
     } else if (Platform.isMacOS) {
+      const vault = (this.app as any).vault;
+      if (!vault.getConfig?.("translucency")) {
+        vault.setConfig?.("translucency", true);
+        document.body.classList.add("is-translucent");
+      }
       this.applyVibrancy();
     }
 
     const openSettings = () => {
       if (Platform.isWin) new PseudoMicaMaterialModal(this.app, this).open();
-      else if (Platform.isMacOS) {
-        if (!document.body.classList.contains("is-translucent")) new TranslucencyPromptModal(this.app, () => new PseudoMicaVibrancyModal(this.app, this).open()).open();
-        else new PseudoMicaVibrancyModal(this.app, this).open();
-      }
+      else if (Platform.isMacOS) new PseudoMicaVibrancyModal(this.app, this).open();
     };
 
     const effectLabel = Platform.isWin ? "Change material" : "Change vibrancy";
@@ -103,38 +101,6 @@ export default class PseudoMicaPlugin extends Plugin {
     } catch (error) {
       console.error("Error applying vibrancy:", error);
     }
-  }
-}
-
-class TranslucencyPromptModal extends Modal {
-  constructor(
-    app: App,
-    private readonly onContinue: () => void,
-  ) {
-    super(app);
-  }
-
-  onOpen(): void {
-    this.setTitle("Pseudo Mica");
-    const { modalEl } = this;
-
-    new Setting(modalEl)
-      .setName(t("plugins.translucency.name", "Translucent window"))
-      .setDesc(t("plugins.translucency.desc", "Turn on translucency effect..."))
-      .addToggle((toggle) =>
-        toggle.setValue(document.body.classList.contains("is-translucent")).onChange((value) => {
-          (this.app as any).vault.setConfig?.("translucency", value);
-          document.body.classList.toggle("is-translucent", value);
-          if (value) {
-            this.close();
-            this.onContinue();
-          }
-        }),
-      );
-  }
-
-  onClose(): void {
-    this.contentEl.empty();
   }
 }
 
