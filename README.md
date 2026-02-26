@@ -29,13 +29,13 @@ Pseudo Mica uses [Electron's native window APIs](https://www.electronjs.org/docs
 
 Calls [`setBackgroundMaterial()`](https://www.electronjs.org/docs/latest/api/browser-window#winsetbackgroundmaterialmaterial-windows) with your choice of **Mica**, **Mica Alt**, or **Acrylic**, and adds `is-translucent` class to `body`, mirroring Obsidian's behavior when **Translucent window** option is enabled on macOS.
 
-Requires Obsidian in **Hidden** or **Obsidian frame** in **Apperance** settings.
+Requires **Settings → Apperance → Window frame style → Hidden / Obsidian frame**.
 
 ### macOS
 
 Calls [`setVibrancy()`](https://www.electronjs.org/docs/latest/api/browser-window#winsetvibrancytype-options-macos) with one of the supported vibrancy types (e.g. `sidebar`, `window`, `under-window`).
 
-Overrides **Translucent window** in **Apperance** settings.
+Requires **Settings → Apperance → Translucent window**.
 
 ## License
 
