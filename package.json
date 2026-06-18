@@ -1,6 +1,6 @@
 {
   "name": "pseudo-mica",
-  "version": "2.2.3",
+  "version": "2.2.4",
   "main": "main.js",
   "type": "module",
   "scripts": {
@@ -17,6 +17,6 @@
     "typescript": "^6.0.3"
   },
   "dependencies": {
-    "obsidian": "latest"
+    "obsidian": "1.13.1"
   }
 }
