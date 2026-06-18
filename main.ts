@@ -8,6 +8,27 @@ interface BrowserWindow {
   setVibrancy(type: VibrancyType): void;
 }
 
+declare const require: (moduleName: string) => unknown;
+
+interface ObsidianVaultConfig {
+  getConfig?(key: "translucency"): boolean;
+  setConfig?(key: "translucency", value: boolean): void;
+}
+
+interface LabeledOption<T extends string> {
+  value: T;
+  label: string;
+}
+
+interface CustomWindow extends Window {
+  require?: (moduleName: string) => unknown;
+}
+
+interface FuzzySuggestModalChooser<V extends string> {
+  values?: { item: LabeledOption<V> }[];
+  setSelectedItem(index: number, scroll: boolean): void;
+}
+
 interface PseudoMicaSettings {
   material: MaterialType;
   vibrancy: VibrancyType;
@@ -19,7 +40,7 @@ const DEFAULT_SETTINGS: PseudoMicaSettings = {
 };
 
 export default class PseudoMicaPlugin extends Plugin {
-  settings: PseudoMicaSettings;
+  settings!: PseudoMicaSettings;
   private electronWindow: BrowserWindow | null = null;
 
   async onload() {
@@ -31,29 +52,67 @@ export default class PseudoMicaPlugin extends Plugin {
 
     if (Platform.isWin) {
       this.applyMaterial();
-      document.body.classList.add("is-translucent");
-      document.body.style.setProperty("--workspace-background-translucent", "transparent", "important");
-      document.body.style.setProperty("--titlebar-background", "transparent", "important");
-      document.body.style.setProperty("--titlebar-background-focused", "transparent", "important");
+      activeDocument.body.classList.add("is-translucent");
+      activeDocument.body.setCssProps({
+        "--workspace-background-translucent": "transparent",
+        "--titlebar-background": "transparent",
+        "--titlebar-background-focused": "transparent",
+      });
     } else if (Platform.isMacOS) {
-      const vault = (this.app as any).vault;
-      if (!vault.getConfig?.("translucency")) {
+      const vault = this.app.vault as unknown as ObsidianVaultConfig;
+      if (vault.getConfig && !vault.getConfig("translucency")) {
         vault.setConfig?.("translucency", true);
-        document.body.classList.add("is-translucent");
+        activeDocument.body.classList.add("is-translucent");
       }
       this.applyVibrancy();
     }
 
     const openSettings = () => {
-      if (Platform.isWin) new PseudoMicaMaterialModal(this.app, this).open();
-      else if (Platform.isMacOS) new PseudoMicaVibrancyModal(this.app, this).open();
+      if (Platform.isWin) {
+        new PseudoMicaModal(
+          this.app,
+          this,
+          "Select material...",
+          "material",
+          [
+            { value: "mica", label: "Mica" },
+            { value: "tabbed", label: "Mica Alt" },
+            { value: "acrylic", label: "Acrylic" },
+          ],
+          () => this.applyMaterial(),
+        ).open();
+      } else if (Platform.isMacOS) {
+        new PseudoMicaModal(
+          this.app,
+          this,
+          "Select vibrancy...",
+          "vibrancy",
+          [
+            { value: "titlebar", label: "Titlebar" },
+            { value: "selection", label: "Selection" },
+            { value: "menu", label: "Menu" },
+            { value: "popover", label: "Popover" },
+            { value: "sidebar", label: "Sidebar" },
+            { value: "header", label: "Header" },
+            { value: "sheet", label: "Sheet" },
+            { value: "window", label: "Window" },
+            { value: "hud", label: "HUD" },
+            { value: "fullscreen-ui", label: "Fullscreen UI" },
+            { value: "tooltip", label: "Tooltip" },
+            { value: "content", label: "Content" },
+            { value: "under-window", label: "Under Window" },
+            { value: "under-page", label: "Under Page" },
+          ],
+          () => this.applyVibrancy(),
+        ).open();
+      }
     };
 
     const effectLabel = Platform.isWin ? "Change material" : "Change vibrancy";
     this.addRibbonIcon("layers", effectLabel, openSettings);
 
     this.addCommand({
-      id: "open-pseudo-mica-settings",
+      id: "open-settings",
       name: effectLabel,
       callback: openSettings,
     });
@@ -62,17 +121,19 @@ export default class PseudoMicaPlugin extends Plugin {
   onunload() {
     if (Platform.isWin) {
       this.electronWindow?.setBackgroundMaterial?.("none");
-      document.body.classList.remove("is-translucent");
-      document.body.style.removeProperty("--workspace-background-translucent");
-      document.body.style.removeProperty("--titlebar-background");
-      document.body.style.removeProperty("--titlebar-background-focused");
+      activeDocument.body.classList.remove("is-translucent");
+      activeDocument.body.setCssProps({
+        "--workspace-background-translucent": "",
+        "--titlebar-background": "",
+        "--titlebar-background-focused": "",
+      });
     } else if (Platform.isMacOS) {
       this.electronWindow?.setVibrancy?.(null);
     }
   }
 
   async loadSettings() {
-    this.settings = Object.assign({}, DEFAULT_SETTINGS, await this.loadData());
+    this.settings = Object.assign({}, DEFAULT_SETTINGS, (await this.loadData()) as Partial<PseudoMicaSettings>);
   }
 
   async saveSettings() {
@@ -81,7 +142,9 @@ export default class PseudoMicaPlugin extends Plugin {
 
   private getElectronWindow(): BrowserWindow | null {
     try {
-      return require("@electron/remote")?.getCurrentWindow() || (window as any).require?.("@electron/remote")?.getCurrentWindow() || null;
+      const req = typeof require !== "undefined" ? require : (window as unknown as CustomWindow).require;
+      const remote = req?.("@electron/remote") as { getCurrentWindow(): BrowserWindow } | undefined;
+      return remote?.getCurrentWindow() ?? null;
     } catch {
       return null;
     }
@@ -104,39 +167,32 @@ export default class PseudoMicaPlugin extends Plugin {
   }
 }
 
-interface LabeledOption<T extends string> {
-  value: T;
-  label: string;
-}
-
-abstract class PseudoMicaModal<T extends string> extends FuzzySuggestModal<LabeledOption<T>> {
-  protected abstract readonly options: LabeledOption<T>[];
-  private readonly originalValue: T | null;
+class PseudoMicaModal<K extends keyof PseudoMicaSettings> extends FuzzySuggestModal<LabeledOption<PseudoMicaSettings[K] & string>> {
+  private readonly originalValue: PseudoMicaSettings[K];
   private confirmed = false;
 
   constructor(
     app: App,
-    protected readonly plugin: PseudoMicaPlugin,
+    private readonly plugin: PseudoMicaPlugin,
     placeholder: string,
+    private readonly key: K,
+    private readonly options: LabeledOption<PseudoMicaSettings[K] & string>[],
+    private readonly applyEffect: () => void,
   ) {
     super(app);
     this.setPlaceholder(placeholder);
-    this.originalValue = this.getSetting();
+    this.originalValue = plugin.settings[key];
   }
 
-  protected abstract getSetting(): T | null;
-  protected abstract setSetting(value: T | null): void;
-  protected abstract applyEffect(): void;
-
   onOpen(): void {
-    super.onOpen();
-    const chooser = (this as any).chooser;
+    void super.onOpen();
+    const chooser = (this as unknown as { chooser: FuzzySuggestModalChooser<PseudoMicaSettings[K] & string> }).chooser;
     const orig = chooser.setSelectedItem.bind(chooser);
     chooser.setSelectedItem = (index: number, scroll: boolean) => {
       orig(index, scroll);
       const selected = chooser.values?.[index];
       if (selected) {
-        this.setSetting(selected.item.value);
+        this.plugin.settings[this.key] = selected.item.value;
         this.applyEffect();
       }
     };
@@ -144,78 +200,25 @@ abstract class PseudoMicaModal<T extends string> extends FuzzySuggestModal<Label
 
   onClose(): void {
     if (!this.confirmed) {
-      this.setSetting(this.originalValue);
+      this.plugin.settings[this.key] = this.originalValue;
       this.applyEffect();
     }
   }
 
-  getItems(): LabeledOption<T>[] {
+  getItems(): LabeledOption<PseudoMicaSettings[K] & string>[] {
     return this.options;
   }
 
-  getItemText(item: LabeledOption<T>): string {
+  getItemText(item: LabeledOption<PseudoMicaSettings[K] & string>): string {
     return item.label;
   }
 
-  async onChooseItem(item: LabeledOption<T>): Promise<void> {
+  onChooseItem(item: LabeledOption<PseudoMicaSettings[K] & string>): void {
     this.confirmed = true;
-    this.setSetting(item.value);
-    await this.plugin.saveSettings();
+    this.plugin.settings[this.key] = item.value;
+    this.plugin.saveSettings().catch((error) => {
+      console.error("Failed to save settings:", error);
+    });
     this.applyEffect();
-  }
-}
-
-class PseudoMicaMaterialModal extends PseudoMicaModal<MaterialType> {
-  protected readonly options: LabeledOption<MaterialType>[] = [
-    { value: "mica", label: "Mica" },
-    { value: "tabbed", label: "Mica Alt" },
-    { value: "acrylic", label: "Acrylic" },
-  ];
-
-  constructor(app: App, plugin: PseudoMicaPlugin) {
-    super(app, plugin, "Select material...");
-  }
-
-  protected getSetting(): MaterialType {
-    return this.plugin.settings.material;
-  }
-  protected setSetting(value: MaterialType | null): void {
-    if (value) this.plugin.settings.material = value;
-  }
-  protected applyEffect(): void {
-    this.plugin.applyMaterial();
-  }
-}
-
-class PseudoMicaVibrancyModal extends PseudoMicaModal<NonNullable<VibrancyType>> {
-  protected readonly options: LabeledOption<NonNullable<VibrancyType>>[] = [
-    { value: "titlebar", label: "Titlebar" },
-    { value: "selection", label: "Selection" },
-    { value: "menu", label: "Menu" },
-    { value: "popover", label: "Popover" },
-    { value: "sidebar", label: "Sidebar" },
-    { value: "header", label: "Header" },
-    { value: "sheet", label: "Sheet" },
-    { value: "window", label: "Window" },
-    { value: "hud", label: "HUD" },
-    { value: "fullscreen-ui", label: "Fullscreen UI" },
-    { value: "tooltip", label: "Tooltip" },
-    { value: "content", label: "Content" },
-    { value: "under-window", label: "Under Window" },
-    { value: "under-page", label: "Under Page" },
-  ];
-
-  constructor(app: App, plugin: PseudoMicaPlugin) {
-    super(app, plugin, "Select vibrancy...");
-  }
-
-  protected getSetting(): VibrancyType {
-    return this.plugin.settings.vibrancy;
-  }
-  protected setSetting(value: NonNullable<VibrancyType> | null): void {
-    this.plugin.settings.vibrancy = value;
-  }
-  protected applyEffect(): void {
-    this.plugin.applyVibrancy();
   }
 }

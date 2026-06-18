@@ -3,19 +3,17 @@
     "inlineSourceMap": true,
     "inlineSources": true,
     "module": "ESNext",
-    "target": "ES2020",
-    "allowJs": true,
-    "noImplicitAny": true,
-    "noImplicitThis": true,
+    "target": "ES2021",
+    "strict": true,
     "noImplicitReturns": true,
-    "moduleResolution": "node",
-    "importHelpers": true,
+    "noFallthroughCasesInSwitch": true,
     "noUncheckedIndexedAccess": true,
+    "moduleResolution": "bundler",
     "isolatedModules": true,
-    "strictNullChecks": true,
-    "strictBindCallApply": true,
+    "skipLibCheck": true,
+    "forceConsistentCasingInFileNames": true,
     "allowSyntheticDefaultImports": true,
-    "useUnknownInCatchVariables": true
+    "lib": ["ES2021", "DOM"]
   },
   "include": ["**/*.ts"]
 }

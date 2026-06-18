@@ -1,7 +1,7 @@
 {
   "id": "pseudo-mica",
   "name": "Pseudo Mica",
-  "version": "2.2.0",
+  "version": "2.2.3",
   "minAppVersion": "1.6.0",
   "description": "Customize translucent window effects on Windows and macOS.",
   "author": "Alexis C",
